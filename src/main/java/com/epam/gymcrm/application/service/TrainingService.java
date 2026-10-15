@@ -3,15 +3,18 @@ package com.epam.gymcrm.application.service;
 import com.epam.gymcrm.application.port.out.TraineeDao;
 import com.epam.gymcrm.application.port.out.TrainerDao;
 import com.epam.gymcrm.application.port.out.TrainingDao;
+import com.epam.gymcrm.domain.model.Trainee;
+import com.epam.gymcrm.domain.model.Trainer;
 import com.epam.gymcrm.domain.model.Training;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 
 @Service
 public class TrainingService {
@@ -21,6 +24,7 @@ public class TrainingService {
     private TrainingDao trainingDao;
     private TraineeDao traineeDao;
     private TrainerDao trainerDao;
+    private AuthenticationService authenticationService;
 
     @Autowired
     public void setTrainingDao(TrainingDao trainingDao) {
@@ -37,25 +41,48 @@ public class TrainingService {
         this.trainerDao = trainerDao;
     }
 
-    public Training create(Training training) {
-        if (traineeDao.findById(training.traineeId()).isEmpty()) {
-            log.warn("Trainee not found, id={}", training.traineeId());
-            throw new NoSuchElementException("Trainee not found: " + training.traineeId());
-        }
-        if (trainerDao.findById(training.trainerId()).isEmpty()) {
-            log.warn("Trainer not found, id={}", training.trainerId());
-            throw new NoSuchElementException("Trainer not found: " + training.trainerId());
-        }
-        Training saved = trainingDao.save(training);
-        log.info("Created training id={}", saved.id());
+    @Autowired
+    public void setAuthenticationService(AuthenticationService authenticationService) {
+        this.authenticationService = authenticationService;
+    }
+
+    /** The authenticated trainer adds a training with the given trainee. */
+    @Transactional
+    public Training addTraining(String trainerUsername, String trainerPassword, NewTraining request) {
+        authenticationService.authenticateTrainer(trainerUsername, trainerPassword);
+        Validation.requireNotNull(request, "training");
+        Validation.requireText(request.traineeUsername(), "traineeUsername");
+        Validation.requireText(request.name(), "trainingName");
+        Validation.requireNotNull(request.type(), "trainingType");
+        Validation.requireText(request.type().name(), "trainingType");
+        Validation.requireNotNull(request.date(), "trainingDate");
+        Validation.requirePositive(request.duration(), "trainingDuration");
+
+        Trainer trainer = trainerDao.findByUsername(trainerUsername)
+                .orElseThrow(() -> new NoSuchElementException("Trainer not found: " + trainerUsername));
+        Trainee trainee = traineeDao.findByUsername(request.traineeUsername())
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Trainee not found: " + request.traineeUsername()));
+
+        Training saved = trainingDao.save(new Training(null, trainee.id(), trainer.id(), request.name(),
+                request.type(), request.date(), request.duration()));
+        log.info("Added training id={}", saved.id());
         return saved;
     }
 
-    public Optional<Training> findById(Long id) {
-        return trainingDao.findById(id);
+    /** Trainings of the trainee; every filter except the credentials may be null. */
+    @Transactional(readOnly = true)
+    public List<Training> getTraineeTrainings(String username, String password, LocalDate from,
+                                              LocalDate to, String trainerName, String trainingTypeName) {
+        authenticationService.authenticateTrainee(username, password);
+        return trainingDao.findForTrainee(username, from, to, trainerName, trainingTypeName);
     }
 
-    public List<Training> findAll() {
-        return trainingDao.findAll();
+    /** Trainings of the trainer; every filter except the credentials may be null. */
+    @Transactional(readOnly = true)
+    public List<Training> getTrainerTrainings(String username, String password, LocalDate from,
+                                              LocalDate to, String traineeName) {
+        authenticationService.authenticateTrainer(username, password);
+        return trainingDao.findForTrainer(username, from, to, traineeName);
     }
 }

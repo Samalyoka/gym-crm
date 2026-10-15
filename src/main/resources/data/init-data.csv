@@ -1,9 +1,0 @@
-# TRAINEE,id,firstName,lastName,username,password,active,dateOfBirth,address
-# TRAINER,id,firstName,lastName,username,password,active,specialization
-# TRAINING,id,traineeId,trainerId,name,type,date,durationMinutes
-TRAINEE,1,John,Smith,John.Smith,pass123456,true,1990-05-15,Astana Abay 1
-TRAINEE,2,Aigul,Nurova,Aigul.Nurova,pass654321,true,1995-11-02,Astana Mangilik El 5
-TRAINER,1,Anna,Brown,Anna.Brown,trainer1234,true,YOGA
-TRAINER,2,Max,Miller,Max.Miller,trainer5678,true,FITNESS
-TRAINING,1,1,1,Morning yoga,YOGA,2026-09-01,60
-TRAINING,2,2,2,Strength basics,FITNESS,2026-09-02,45
